@@ -1,21 +1,10 @@
 # type: ignore
 
-import json
-from modelstruct import Field, fields as dataclass_fields, MISSING, is_dataclass
+from .modelstruct import fields as dataclass_fields, MISSING, is_dataclass
 
 __BASICTYPES = (int, str, float, bool, list, dict, set, tuple, object)
 __conversion_cache: 'dict[type, Any]' = dict()
 
-def __make_default(fld: Field):
-    ret = fld.default
-    if ret is not MISSING:
-        return ret
-    
-    ret = fld.default_factory
-    if ret is not MISSING:
-        return ret()
-    
-    return None
 
 def get_sanitized_converter(name: str):
     conv = __conversion_cache.get(name)

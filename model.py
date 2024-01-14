@@ -1,4 +1,4 @@
-from modelstruct import dataclass, CTOR, field
+from util.modelstruct import dataclass, field
 
 
 #region CF Manifest

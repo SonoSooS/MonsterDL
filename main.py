@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 import json
-from prettyprint import pp_print as pp, pp as pp_format
-from json_to_dataclass import parse as json_to_obj, add_module
-from modelstruct import pydefault
+
+from util.prettyprint import pp_print as pp, pp as pp_format
+from util.json_to_dataclass import parse as json_to_obj, add_module
+from util.modelstruct import pydefault
 
 import zipfile
 import glob

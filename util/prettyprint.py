@@ -1,4 +1,4 @@
-from modelstruct import fields as dataclass_fields, is_dataclass
+from .modelstruct import fields as dataclass_fields, is_dataclass
 
 __SENTINEL = object()
 
