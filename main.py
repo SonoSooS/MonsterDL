@@ -5,6 +5,7 @@ import json
 from util.prettyprint import pp_print as pp, pp as pp_format
 from util.json_to_dataclass import parse as json_to_obj, add_module
 from util.modelstruct import pydefault
+from util.webparser import WebJSONExtractor
 
 import zipfile
 import glob
@@ -22,21 +23,97 @@ except:
 import model
 add_module(model)
 
-FILEPATH = "C:\\Downloads\\"
+FILEPATH = "local/"
+
+def parse_website_recursive(obj):
+    if not isinstance(obj, dict):
+        return None
+    
+    if 'provider' in obj:
+        return obj
+    
+    for v in obj.values():
+        ret = parse_website_recursive(v)
+        if ret is not None:
+            return ret
+    
+    return None
+
+def parse_website(content):
+    extractor = WebJSONExtractor()
+    extractor.feed(content)
+    assert extractor.content is not None
+    data = extractor.content or None
+    
+    if data is None:
+        return None
+    
+    data = json.loads(data)
+    return parse_website_recursive(data)
+
+def download_pack_meta(url: 'str|None'):
+    if url:
+        with requests.get(url) as req:
+            req.raise_for_status()
+            if not req.encoding:
+                req.encoding = 'utf-8'
+            ctype = req.headers['Content-Type']
+            data = req.text
+            
+            if ctype == "application/json":
+                data = json.loads(data)
+            elif ctype.startswith("text/html"):
+                data = parse_website(data)
+            else:
+                raise ValueError("Webpage provided is invalid (modpack platform not supported?)")
+    else:
+        with open(FILEPATH + "pack.html", 'r', encoding='utf-8') as fi:
+            data = fi.read()
+        
+        data = parse_website(data)
+    
+    if data is None:
+        with open(FILEPATH + "api_119.json", 'r') as fi:
+        #with open(FILEPATH + "api_119_11441.json", 'r') as fi:
+        #with open(FILEPATH + "api_119_11441_mods.json", 'r') as fi:
+            data = json.load(fi)
+    
+    return data
+
+def build_pack_version_url(provider: str, pack: int, version: int):
+    #return 'file://./local/api_%u_%u.json' % (pack, version)
+    
+    if not provider.startswith("api."):
+        provider = 'api.' + provider
+    
+    return 'https://%s/public/modpack/%u/%u' % (provider, pack, version)
+
+def download_pack_version(url: str):
+    with requests.get(url) as req:
+        req.raise_for_status()
+        if not req.encoding:
+            req.encoding = 'utf-8'
+        data = req.text
+        data = json.loads(data)
+    
+    return data
+
 
 def main():
-    #with open(FILEPATH + "api_119.json", 'r') as fi:
-    with open(FILEPATH + "api_119_11441.json", 'r') as fi:
-    #with open(FILEPATH + "api_119_11441_mods.json", 'r') as fi:
-        data = json.load(fi)
+    print("Enter *full* website URL to download modpack from")
+    print("(URL should look like https://<website>/modpacks/<modpack name>)")
+    url = input('> ')
     
-    #pp(data, 4)
+    data = download_pack_meta(url)
+    smeta: model.CHModpackMeta = json_to_obj(data, model.CHModpackMeta) # type: ignore
     
-    #smeta: model.CHModpackMeta = json_to_obj(data, model.CHModpackMeta) # type: ignore
+    #TODO: version picker UI
+    max_verion = max(smeta.versions, default=None, key=lambda x:x.id)
+    assert max_verion is not None
+    
+    version_url = build_pack_version_url(smeta.provider, smeta.id, max_verion.id)
+    data = download_pack_version(version_url)
     sver: model.CHVersionMetadata = json_to_obj(data, model.CHVersionMetadata) # type: ignore
-    
-    #pp(smeta, 4)
-    #pp(sver, 4)
     
     print("Parsing...")
     
@@ -46,6 +123,13 @@ def main():
     res.name = "Modpack Converter example modpack"
     res.version = "1.0.0"
     res.author = "Modpack Converter"
+    
+    if smeta:
+        res.name = smeta.name
+        res.version = max_verion.name
+        #HACK: no author field, not sure what to put there
+    
+    #FIXME: security issue, sanitize paths and stuff
     
     for target in sver.targets:
         if target.type == 'game':
@@ -59,6 +143,8 @@ def main():
             res.minecraft.modLoaders.append(ml)
     
     to_download: dict[str, str] = dict()
+    
+    #TODO: do not hardcode paths
     
     for file in sver.files:
         if file.serveronly:
@@ -83,9 +169,7 @@ def main():
     
     print("TODO: download files")
     
-    #pp(to_download, 4)
-    
-    if False:
+    if True:
         with requests.Session() as sess:
             i = 0
             ni = len(to_download)
@@ -106,6 +190,10 @@ def main():
                             for chunk in req.iter_content(None):
                                 fo.write(chunk)
                                 progress.next(len(chunk))
+    else:
+        #pp(to_download, 4)
+        pass
+    
     
     print("Compressing...")
     

@@ -91,7 +91,9 @@ class CHModpackMetaVersion:
     
 @dataclass
 class CHModpackMeta:
+    id: int
     name: str
+    provider: str
     versions: 'list[CHModpackMetaVersion]'
 
 #endregion
